@@ -1,1 +1,1 @@
-# Scheduled-Mail-Notofication-Spring-Boot
+# Scheduled-Mail-Notification-Spring-Boot
