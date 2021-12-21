@@ -17,9 +17,11 @@ import org.springframework.stereotype.Controller;
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.ExecutionException;
+
 
 @Controller
 @Configuration
@@ -36,6 +38,9 @@ public class NotificationsController {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    private SmsSenderService smsResponse;
+    private SmsRequest smsRequest;
 
     /** Sending email notification **/
     private void sendMail(User user, Meetings meeting) throws MessagingException, UnsupportedEncodingException {
@@ -67,11 +72,24 @@ public class NotificationsController {
         mailSender.send(message);
     }
 
+    public void notificationTimer(Meetings meeting, User user) throws ExecutionException, InterruptedException {
+        LocalDateTime time = LocalDateTime.of(meeting.getMeetingDate(),
+                meeting.getStartTime()).minusMinutes(15);
+    }
+
     @Scheduled(cron = "*/30 * 10 * * *")
     void sendMails() throws MessagingException, UnsupportedEncodingException {
 
+
+
         /** Get today's meetings **/
         List<Meetings> meetings = meetingRepository.findTodayMeetings();
+
+        /**Testing*/
+
+//        LocalDateTime time = LocalDateTime.of(meeting.getMeetingDate(),
+//                meeting.getStartTime()).minusMinutes(15);
+        /**Testing*/
         /** Sending to the Owner */
         for (Meetings meeting : meetings){
 
@@ -80,7 +98,7 @@ public class NotificationsController {
 
             sendMail(owner, meeting);
 
-            /** Sending to the CoOwners */
+            /** Sending to the CoOwner(s) */
             for (User user : meeting.getUsers()){
 
                 sendMail(user, meeting);
@@ -90,5 +108,49 @@ public class NotificationsController {
 
     }
     /** End of Sending email notifications **/
+    /** Sending Sms notifications **/
+
+    void sendSMS(User user, Meetings meeting){
+
+        String phoneNumber = user.getPhone();
+//        String fName = user.getFirstName();
+//        String lName = user.getLastName();
+        String message = "Hi "+ user.getFirstName()+ "  "+ user.getFirstName()+ "  ." +
+                "the " + meeting.getMeeting_name()+  " for  " + meeting.getOrganization().getOrganization_name() +" is scheduled to commence today at "
+                + meeting.getStartTime()
+                + "The venue of the meeting will be at " + meeting.getBoardroom().getBoardroom_name() +
+                "Kindly avail yourself in time.";
+
+
+        smsRequest.setPhoneNumber(phoneNumber);
+        smsRequest.setMessage(message);
+
+        smsResponse.sendSms(smsRequest);
+
+    }
+
+    // TODO: Verify twilio numbers to send sms
+    @Scheduled(cron = "*/40 78 * * * *")
+    void sendManySms(){
+
+        List<Meetings> meetings = meetingRepository.findTodayMeetings();
+
+        for (Meetings meeting : meetings){
+
+            long ownerId = meeting.getOwner_id();
+            User owner = userRepository.findByOwnerId(ownerId);
+
+            /** Sending to the Owner(s) */
+            sendSMS(owner, meeting);
+
+            /** Sending to the CoOwner(s) */
+            for (User user : meeting.getUsers()){
+
+                sendSMS(user, meeting);
+                System.out.println("Sms Sent at " +LocalTime.now());
+            }
+        }
+        }
+    /** End of Sending Sms notifications **/
 
 }
